@@ -2,34 +2,34 @@
 Simple web game of hangman, with command line interface.
 
 
-Project Title:
+##**Project Title:**
 Hangman
 
-Team:
+##**Team:**
 Collyn Miller
 
-Project Objective:
+##**Project Objective:**
 The goal is to make a functional multiplayer game of hangman in a commmand line interface.
 
-Scope:
-Inclusions:
+##**Scope:**
+###**Inclusions:**
 Ability to choose custom word to guess.
 Back and forth responses with feedback on right or wrong guesses.
 
-Exclusions:
+###**Exclusions:**
 Graphical functionality beyond simple ASCII rendering.
 
-Deliverables:
+##**Deliverables:**
 A working python script that sets up the game, and allows someone else to connect to it with an address and password.
 
-Technical Requirements:
-Hardware:
+##**Technical Requirements:**
+###**Hardware:**
 No specific hardware requried, other than an internet connected device and CLI.
 
-Software:
+###**Software:**
 Python
 Socket and networking libraries
 Dictionary libraries
 
-Assumptions:
+##**Assumptions:**
 I will assume a consistantly available internet connection.
