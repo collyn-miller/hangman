@@ -1,12 +1,12 @@
+#Author: Collyn Miller
+#for use with hangmanClient.py
+
 import socket
 import argparse
 import json
 import threading
-import random
 
-MAX_PLAYERS = 2
-TARGET_SCORE = 20
-
+#game state will hold the state information between the client and server threads
 game_state = {
     "players": [],
     "turn": 0,
@@ -14,10 +14,12 @@ game_state = {
     "letters": [],
     "display": ""
 }
+
 players = []
 
-lock = threading.Lock()  # To ensure thread-safe operations
+lock = threading.Lock()  # To enable turn taking
 
+#enables us to send updates for all players to see
 def broadcast(message):
     for player in players:
         player.sendall(message)
@@ -27,11 +29,17 @@ def hmServer():
     #parsing input flags
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-p", "--portNumber")
+    parser.add_argument("-p", "--portNumber", help="Desired port number to use.")
+    parser.add_argument("-n", "--numPlayers", help="Desired number of client players.")
     args = parser.parse_args()
 
-    host = socket.gethostname()
+    host = "0.0.0.0"
     port = int(args.portNumber)
+
+    #defaults to 2 players, can set higher with -n flag
+    max_players = 2
+    if args.numPlayers is not None:
+        max_players = int(args.numPlayers)
 
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
     server_socket.bind((host, port)) 
@@ -43,31 +51,33 @@ def hmServer():
         else:
             print(f"Please enter another word. Either you used a non alphabet character or input the wrong length.")
 
+    #constructs the initial blank display
     blank = "_"
     for i in range(len(word)):
         game_state["display"] += blank
 
-    #print(game_state["display"])
     server_socket.listen(2)
-    print(f"Server started. Waiting for {MAX_PLAYERS} players...")
+    print(f"Server started. Waiting for {max_players} players...")
 
-    for i in range(1,(MAX_PLAYERS+1)):
+    #constructs and starts the appropriate threads, one per player
+    for i in range(1,(max_players+1)):
         conn, addr = server_socket.accept()
         player_id = i
         game_state["players"].append(player_id)
         players.append(conn)
-        threading.Thread(target=gameClient, args=(conn, addr, player_id, word)).start()
+        threading.Thread(target=gameClient, args=(conn, addr, player_id, word, max_players)).start()
     
+    #sets the turn to 1, once everyone is connected
     game_state["turn"] = 1
-    broadcast(json.dumps({"game_state": game_state}).encode())
-
-        
-
+    broadcast(json.dumps({"message": "All players connected, Game Starting!","game_state": game_state}).encode())
     
 
-def gameClient(conn, addr, player_id, word):
+def gameClient(conn, addr, player_id, word, max_players):
     print(f"Player {player_id} connected from {addr}")
-    conn.sendall(json.dumps({"id": player_id,"message": f"Welcome Player {player_id}! Once all players have joined, the game will begin.", "game_state": game_state}).encode())
+    message = f"Welcome Player {player_id}! Once all players have joined, the game will begin."
+    if player_id == max_players:
+        message = f"Welcome Player {player_id}! You are the the last to connect, Game Starting Now!"
+    conn.sendall(json.dumps({"id": player_id,"message": message, "game_state": game_state}).encode())
     running = True
 
     try:
@@ -84,37 +94,52 @@ def gameClient(conn, addr, player_id, word):
 
             if game_state["turn"] == player_id:
                 lock.acquire()
-                broadcast(json.dumps({"message":game_state["display"]}).encode())
                 letter = request.get("letter")
-                count = word.count(letter)
-                if count == 0:
-                    game_state["lives"] = game_state["lives"] - 1
-                    message =f"Player {player_id} guessed {letter}. Unfortunately, there is no {letter} in the word. -1 lives."
-                    broadcast(json.dumps({"message":message}).encode())
-
-                elif count == 1:
-                    position = word.find(letter)
-                    message =f"Player {player_id} guessed {letter}. There is a {letter} at position {position}!"
-                    broadcast(json.dumps({"message":message}).encode())
-                    game_state["display"][position] = letter
+                #check for correct word
+                if len(letter) == len(word):
+                    if letter == word:
+                        message = f"Players win! The word was {word}, and you had {game_state['lives']} lives remaining."
+                        print(message)
+                        broadcast(json.dumps({"message":message}).encode())
+                        broadcast(json.dumps({"gameOver":"over"}).encode())
+                        lock.release()
+                        break
+                    else:
+                        game_state["lives"] = game_state["lives"] - 1
+                        message =f"Player {player_id} guessed {letter}. Unfortunately, {letter} wasn't the word. -1 lives."
                 
+                #check for letter appearance in the word
                 else:
-                    for i in range(len(word)):
-                        if word[i] == letter:
-                            game_state["display"][i] = letter
-                    message =f"Player {player_id} guessed {letter}. There are multiple {letter}'s!"
-                    broadcast(json.dumps({"message":message}).encode())
+                    game_state["letters"].append(letter)
+                    count = word.count(letter)
+                    if count == 0:
+                        game_state["lives"] = game_state["lives"] - 1
+                        message =f"Player {player_id} guessed {letter}. Unfortunately, there is no {letter} in the word. -1 lives."
 
+                    elif count == 1:
+                        position = word.find(letter)
+                        message =f"Player {player_id} guessed {letter}. There is a {letter} at position {position}!"
+                        displayList = list(game_state["display"])
+                        displayList[position] = letter
+                        game_state["display"] = "".join(displayList)
+                    
+                    else:
+                        displayList = list(game_state["display"])
+                        for i in range(len(displayList)):
+                            if word[i] == letter:
+                                displayList[i] = letter
+                        game_state["display"] = "".join(displayList)
+                        message =f"Player {player_id} guessed {letter}. There are {count} {letter}'s!"
 
-
-                    # Check for game end condition
+                # Check for game end condition
                 if game_state["display"].count("_") == 0:
-                    message = f"Players win! The word was {word}, and you had {game_state['lives']} remaining."
+                    message = f"Players win! The word was {word}, and you had {game_state['lives']} lives remaining."
                     print(message)
                     broadcast(json.dumps({"message":message}).encode())
                     broadcast(json.dumps({"gameOver":"over"}).encode())
                     lock.release()
                     break
+
                 elif game_state["lives"] == 0:
                     message = f"Players lose! The word was {word}, better luck next time."
                     print(message)
@@ -123,14 +148,12 @@ def gameClient(conn, addr, player_id, word):
                     lock.release()
                     break
 
-
-
                 # Switch turn
                 game_state["turn"] = (game_state["turn"] + 1)
-                if game_state["turn"] > MAX_PLAYERS:
+                if game_state["turn"] > max_players:
                     game_state["turn"] = 1
                 lock.release()
-                broadcast(json.dumps({"game_state": game_state}).encode())
+                broadcast(json.dumps({"message":message + game_state["display"] , "game_state": game_state}).encode())
 
                          
     finally:
