@@ -17,6 +17,12 @@ Example on same computer:
 python3 hangmanClient.py -p 5000 -i 127.0.0.1
 ```
 
+# Roadmap
+I'd like to add a proper graphic to the hangman itself, a picture that fills out as lives are lost. A proper web GUI would go a long way to improving the look.
+
+# Retrospective
+In hindsight using threads caused a lot more time wasted on chasing race conditions, but I don't regret having to learn more about them. If I had gone with a more simple approach, I may have had time to implement more features.
+
 ## **Project Title:**
 Hangman
 
