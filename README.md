@@ -23,6 +23,8 @@ I'd like to add a proper graphic to the hangman itself, a picture that fills out
 # Retrospective
 In hindsight using threads caused a lot more time wasted on chasing race conditions, but I don't regret having to learn more about them. If I had gone with a more simple approach, I may have had time to implement more features.
 
+As a side note, I realized much too late that I was uploading to a non-public git repository, and my sprints haven't been counted properly. I definitely would've fixed that if I did things over.
+
 ## **Project Title:**
 Hangman
 
